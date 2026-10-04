@@ -1,0 +1,43 @@
+/* FarmGuard - Supabase-ready frontend */
+const SUPABASE_URL = "https://eftgwlyjkxmlebwsmetc.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_SdEyHlmE0mLR_R4VYqaabQ_s2jqoOdc";
+const hasSupabase = SUPABASE_URL.startsWith("http") && !SUPABASE_ANON_KEY.startsWith("YOUR_");
+const sb = hasSupabase ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+let mode="login", user=null, selectedFile=null;
+const products=[
+ {id:1,name:"Neem-based Bio Pesticide",type:"BIOLOGICAL",crop:"Multiple crops",purpose:"Helps manage common insect pests.",price:"₹299",stock:"Available",icon:"🌿"},
+ {id:2,name:"Copper Fungicide",type:"FUNGICIDE",crop:"Vegetables & fruits",purpose:"For fungal disease management where label-approved.",price:"₹425",stock:"Available",icon:"🧴"},
+ {id:3,name:"Sulphur Fungicide",type:"FUNGICIDE",crop:"Vegetables & fruits",purpose:"Fungal and mite management; use only as labelled.",price:"₹350",stock:"Available",icon:"🌾"},
+ {id:4,name:"Bacillus Bio-control",type:"BIOLOGICAL",crop:"Vegetables",purpose:"Biological crop-protection option.",price:"₹380",stock:"Available",icon:"🦠"},
+ {id:5,name:"Insect Control Spray",type:"INSECTICIDE",crop:"Cotton & vegetables",purpose:"For labelled insect-pest control.",price:"₹520",stock:"Available",icon:"🪲"},
+ {id:6,name:"Plant Disease Guard",type:"FUNGICIDE",crop:"Vegetables",purpose:"Disease-management product reference.",price:"₹460",stock:"Available",icon:"🍃"}
+];
+const $=id=>document.getElementById(id);
+function toast(t){$("toast").textContent=t;$("toast").style.display="block";setTimeout(()=>$("toast").style.display="none",2500)}
+function showView(v){document.querySelectorAll(".view").forEach(x=>x.classList.add("hidden"));$(v+"View").classList.remove("hidden");window.scrollTo({top:0,behavior:"smooth"})}
+document.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>showView(b.dataset.view));
+
+function renderProducts(filter=""){const q=filter.toLowerCase();$("productsGrid").innerHTML=products.filter(p=>(p.name+p.type+p.crop).toLowerCase().includes(q)).map(p=>`
+<div class="product"><div style="font-size:34px">${p.icon}</div><span class="type">${p.type}</span><h3>${p.name}</h3><p><b>Suitable for:</b> ${p.crop}<br>${p.purpose}</p><div style="display:flex;justify-content:space-between;align-items:center"><span class="price">${p.price}</span><span class="confidence">${p.stock}</span></div></div>`).join("")}
+renderProducts(); $("productSearch").oninput=e=>renderProducts(e.target.value);
+
+$("loginTab").onclick=()=>setMode("login"); $("signupTab").onclick=()=>setMode("signup");
+function setMode(m){mode=m;$("loginTab").classList.toggle("active",m==="login");$("signupTab").classList.toggle("active",m==="signup");$("nameLabel").classList.toggle("hidden",m!=="signup");$("authSubmit").textContent=m==="login"?"Login":"Create account"}
+$("authForm").onsubmit=async e=>{e.preventDefault();const email=$("email").value.trim(),password=$("password").value; 
+ if(sb){try{if(mode==="login"){let r=await sb.auth.signInWithPassword({email,password});if(r.error)throw r.error;user=r.data.user}else{let r=await sb.auth.signUp({email,password,options:{data:{full_name:$("name").value}}});if(r.error)throw r.error;user=r.data.user; if(!user)toast("Check your email to confirm your account.")} if(user)enterApp(user)}catch(err){toast(err.message)}} 
+ else {user={id:"demo-"+Date.now(),email,name:$("name").value||"Demo Farmer",user_metadata:{full_name:$("name").value||"Demo Farmer"}};enterApp(user);toast("Demo mode: connect Supabase for real accounts.")}};
+function enterApp(u){$("authView").classList.add("hidden");$("appView").classList.remove("hidden");$("nav").classList.remove("hidden");$("profileName").textContent=u.user_metadata?.full_name||u.name||"Farmer";$("profileEmail").textContent=u.email;showView("home");loadHistory()}
+$("logoutBtn").onclick=async()=>{if(sb)await sb.auth.signOut();user=null;$("appView").classList.add("hidden");$("nav").classList.add("hidden");$("authView").classList.remove("hidden")};
+
+$("chooseBtn").onclick=()=>$("cropInput").click(); $("dropZone").onclick=e=>{if(e.target.tagName!=="BUTTON")$("cropInput").click()};
+$("cropInput").onchange=e=>handleFile(e.target.files[0]);
+$("dropZone").ondragover=e=>{e.preventDefault()}; $("dropZone").ondrop=e=>{e.preventDefault();handleFile(e.dataTransfer.files[0])};
+function handleFile(f){if(!f||!f.type.startsWith("image/"))return toast("Please choose an image.");selectedFile=f;const url=URL.createObjectURL(f);$("preview").src=url;$("preview").classList.remove("hidden");$("dropZone").classList.add("hidden");$("scanActions").classList.remove("hidden")}
+$("clearBtn").onclick=()=>{selectedFile=null;$("preview").classList.add("hidden");$("dropZone").classList.remove("hidden");$("scanActions").classList.add("hidden");$("cropInput").value=""};
+$("analyzeBtn").onclick=async()=>{if(!selectedFile)return;const btn=$("analyzeBtn");btn.disabled=true;btn.textContent="Analyzing…";setTimeout(async()=>{const diagnosis={name:"Possible fungal leaf disease",confidence:"Demo assessment • AI integration ready",symptoms:"Leaf spots, discoloration or lesions may be associated with fungal disease. A clear close-up and expert confirmation are recommended.",action:"Use an approved crop-specific fungicide only according to its label. Improve airflow, avoid wetting foliage unnecessarily, and remove badly affected material where appropriate.",product:products[1]};renderResult(diagnosis);await saveScan(diagnosis);btn.disabled=false;btn.textContent="🔍 Analyze crop"},1200)};
+function renderResult(d){$("resultCard").innerHTML=`<div class="diagnosis"><span class="pill">AI CROP HEALTH RESULT</span><h2>${d.name}</h2><span class="confidence">${d.confidence}</span><div class="treatment"><b>What to look for</b><p>${d.symptoms}</p><b>Recommended next step</b><p>${d.action}</p><button class="secondary" onclick="showView('products')">View treatment products →</button></div><p class="muted" style="margin-top:18px">This prototype does not replace diagnosis by a qualified agricultural professional.</p></div>`}
+async function saveScan(d){const local={id:Date.now(),name:d.name,date:new Date().toLocaleString(),image:$("preview").src};const arr=JSON.parse(localStorage.getItem("farmguard_scans")||"[]");arr.unshift(local);localStorage.setItem("farmguard_scans",JSON.stringify(arr));if(sb&&user){try{let path=`${user.id}/${Date.now()}-${selectedFile.name}`;await sb.storage.from("crop-images").upload(path,selectedFile);await sb.from("scans").insert({user_id:user.id,disease_name:d.name,confidence:d.confidence,image_path:path})}catch(e){console.warn(e)}}loadHistory()}
+async function loadHistory(){let arr=JSON.parse(localStorage.getItem("farmguard_scans")||"[]");if(sb&&user){const r=await sb.from("scans").select("*").eq("user_id",user.id).order("created_at",{ascending:false});if(!r.error&&r.data?.length)arr=r.data.map(x=>({name:x.disease_name,date:new Date(x.created_at).toLocaleString(),image:""}))}$("historyList").innerHTML=arr.length?arr.map(x=>`<div class="history-item">${x.image?`<img src="${x.image}">`:`<div style="width:85px;height:70px;border-radius:10px;background:#eaf6ed;display:grid;place-items:center;font-size:30px">🌿</div>`}<div><h3>${x.name}</h3><p>${x.date}</p></div></div>`).join(""):`<div class="empty-result"><span>📋</span><h2>No scans yet</h2><p>Your crop scan history will appear here.</p></div>`}
+
+(async()=>{if(sb){const r=await sb.auth.getSession();if(r.data.session)enterApp(r.data.session.user)}})();
