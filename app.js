@@ -1,43 +1,233 @@
-/* FarmGuard - Supabase-ready frontend */
-const SUPABASE_URL = "https://eftgwlyjkxmlebwsmetc.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_SdEyHlmE0mLR_R4VYqaabQ_s2jqoOdc";
-const hasSupabase = SUPABASE_URL.startsWith("http") && !SUPABASE_ANON_KEY.startsWith("YOUR_");
-const sb = hasSupabase ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+// ===== FarmGuard =====
+// Paste your Supabase keys below. Leave as-is to run in demo mode (data stays in this browser).
+const CONFIG = { url: 'YOUR_SUPABASE_URL', key: 'YOUR_SUPABASE_ANON_KEY' };
 
-let mode="login", user=null, selectedFile=null;
-const products=[
- {id:1,name:"Neem-based Bio Pesticide",type:"BIOLOGICAL",crop:"Multiple crops",purpose:"Helps manage common insect pests.",price:"₹299",stock:"Available",icon:"🌿"},
- {id:2,name:"Copper Fungicide",type:"FUNGICIDE",crop:"Vegetables & fruits",purpose:"For fungal disease management where label-approved.",price:"₹425",stock:"Available",icon:"🧴"},
- {id:3,name:"Sulphur Fungicide",type:"FUNGICIDE",crop:"Vegetables & fruits",purpose:"Fungal and mite management; use only as labelled.",price:"₹350",stock:"Available",icon:"🌾"},
- {id:4,name:"Bacillus Bio-control",type:"BIOLOGICAL",crop:"Vegetables",purpose:"Biological crop-protection option.",price:"₹380",stock:"Available",icon:"🦠"},
- {id:5,name:"Insect Control Spray",type:"INSECTICIDE",crop:"Cotton & vegetables",purpose:"For labelled insect-pest control.",price:"₹520",stock:"Available",icon:"🪲"},
- {id:6,name:"Plant Disease Guard",type:"FUNGICIDE",crop:"Vegetables",purpose:"Disease-management product reference.",price:"₹460",stock:"Available",icon:"🍃"}
+const $ = (id) => document.getElementById(id);
+const demo = CONFIG.url.startsWith('YOUR_');
+const sb = demo ? null : window.supabase.createClient(CONFIG.url, CONFIG.key);
+let user = null, file = null, isSignup = false;
+
+const store = {
+  get(k, d) { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+};
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+let toastTimer;
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ----- Data -----
+const PRODUCTS = [
+  { id: 1, name: 'Copper Oxychloride', type: 'Fungicide', target: 'Late blight, leaf spot, bacterial blight', note: 'Protective contact fungicide.' },
+  { id: 2, name: 'Mancozeb', type: 'Fungicide', target: 'Early blight, downy mildew, rust', note: 'Broad-spectrum protectant.' },
+  { id: 3, name: 'Carbendazim', type: 'Fungicide', target: 'Powdery mildew, blast, wilt', note: 'Systemic fungicide.' },
+  { id: 4, name: 'Neem Oil', type: 'Bio-pesticide', target: 'Aphids, whitefly, mites', note: 'Plant-based option for soft-bodied pests.' },
+  { id: 5, name: 'Imidacloprid', type: 'Insecticide', target: 'Aphids, jassids, whitefly', note: 'Systemic insecticide.' },
+  { id: 6, name: 'Streptomycin + Tetracycline', type: 'Bactericide', target: 'Bacterial leaf spot and blight', note: 'Used against bacterial diseases.' },
+  { id: 7, name: 'Sulphur WP', type: 'Fungicide / Miticide', target: 'Powdery mildew, mites', note: 'Contact protectant.' },
+  { id: 8, name: 'Trichoderma viride', type: 'Bio-fungicide', target: 'Root rot, damping-off, wilt', note: 'Soil-applied biological control.' }
 ];
-const $=id=>document.getElementById(id);
-function toast(t){$("toast").textContent=t;$("toast").style.display="block";setTimeout(()=>$("toast").style.display="none",2500)}
-function showView(v){document.querySelectorAll(".view").forEach(x=>x.classList.add("hidden"));$(v+"View").classList.remove("hidden");window.scrollTo({top:0,behavior:"smooth"})}
-document.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>showView(b.dataset.view));
+const DIAGNOSES = [
+  { name: 'Early Blight', sev: 'Moderate', symptoms: 'Brown spots with concentric rings on older leaves.', advice: 'Remove affected leaves, avoid overhead watering and improve spacing.', products: [2, 1] },
+  { name: 'Powdery Mildew', sev: 'Mild', symptoms: 'White powdery coating on leaf surfaces.', advice: 'Increase airflow and avoid excess nitrogen.', products: [7, 3] },
+  { name: 'Leaf Spot (Bacterial)', sev: 'Moderate', symptoms: 'Small dark water-soaked spots with yellow halos.', advice: 'Remove infected leaves, avoid working in wet fields.', products: [6, 1] },
+  { name: 'Aphid Infestation', sev: 'Mild', symptoms: 'Curled leaves, sticky residue and clusters of small insects.', advice: 'Spray water to dislodge aphids and encourage natural predators.', products: [4, 5] },
+  { name: 'Healthy Crop', sev: 'None', symptoms: 'No clear signs of disease or pests detected.', advice: 'Keep monitoring regularly and maintain good field hygiene.', products: [] }
+];
 
-function renderProducts(filter=""){const q=filter.toLowerCase();$("productsGrid").innerHTML=products.filter(p=>(p.name+p.type+p.crop).toLowerCase().includes(q)).map(p=>`
-<div class="product"><div style="font-size:34px">${p.icon}</div><span class="type">${p.type}</span><h3>${p.name}</h3><p><b>Suitable for:</b> ${p.crop}<br>${p.purpose}</p><div style="display:flex;justify-content:space-between;align-items:center"><span class="price">${p.price}</span><span class="confidence">${p.stock}</span></div></div>`).join("")}
-renderProducts(); $("productSearch").oninput=e=>renderProducts(e.target.value);
+// ----- Navigation -----
+const VIEWS = ['home', 'scan', 'products', 'history', 'profile', 'settings'];
+function go(view) {
+  if (!user) return;
+  VIEWS.forEach((v) => $(v + 'View').classList.toggle('hidden', v !== view));
+  closeMenu(); window.scrollTo(0, 0);
+  if (view === 'products') renderProducts();
+  if (view === 'history') renderHistory();
+  if (view === 'profile') renderProfile();
+}
+function closeMenu() { $('menuPanel').classList.add('hidden'); $('menuBtn').setAttribute('aria-expanded', 'false'); }
 
-$("loginTab").onclick=()=>setMode("login"); $("signupTab").onclick=()=>setMode("signup");
-function setMode(m){mode=m;$("loginTab").classList.toggle("active",m==="login");$("signupTab").classList.toggle("active",m==="signup");$("nameLabel").classList.toggle("hidden",m!=="signup");$("authSubmit").textContent=m==="login"?"Login":"Create account"}
-$("authForm").onsubmit=async e=>{e.preventDefault();const email=$("email").value.trim(),password=$("password").value; 
- if(sb){try{if(mode==="login"){let r=await sb.auth.signInWithPassword({email,password});if(r.error)throw r.error;user=r.data.user}else{let r=await sb.auth.signUp({email,password,options:{data:{full_name:$("name").value}}});if(r.error)throw r.error;user=r.data.user; if(!user)toast("Check your email to confirm your account.")} if(user)enterApp(user)}catch(err){toast(err.message)}} 
- else {user={id:"demo-"+Date.now(),email,name:$("name").value||"Demo Farmer",user_metadata:{full_name:$("name").value||"Demo Farmer"}};enterApp(user);toast("Demo mode: connect Supabase for real accounts.")}};
-function enterApp(u){$("authView").classList.add("hidden");$("appView").classList.remove("hidden");$("nav").classList.remove("hidden");$("profileName").textContent=u.user_metadata?.full_name||u.name||"Farmer";$("profileEmail").textContent=u.email;showView("home");loadHistory()}
-$("logoutBtn").onclick=async()=>{if(sb)await sb.auth.signOut();user=null;$("appView").classList.add("hidden");$("nav").classList.add("hidden");$("authView").classList.remove("hidden")};
+$('menuBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const open = $('menuPanel').classList.toggle('hidden') === false;
+  $('menuBtn').setAttribute('aria-expanded', String(open));
+});
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-view]');
+  if (b) { go(b.dataset.view); return; }
+  if (!$('menuPanel').contains(e.target)) closeMenu();
+});
 
-$("chooseBtn").onclick=()=>$("cropInput").click(); $("dropZone").onclick=e=>{if(e.target.tagName!=="BUTTON")$("cropInput").click()};
-$("cropInput").onchange=e=>handleFile(e.target.files[0]);
-$("dropZone").ondragover=e=>{e.preventDefault()}; $("dropZone").ondrop=e=>{e.preventDefault();handleFile(e.dataTransfer.files[0])};
-function handleFile(f){if(!f||!f.type.startsWith("image/"))return toast("Please choose an image.");selectedFile=f;const url=URL.createObjectURL(f);$("preview").src=url;$("preview").classList.remove("hidden");$("dropZone").classList.add("hidden");$("scanActions").classList.remove("hidden")}
-$("clearBtn").onclick=()=>{selectedFile=null;$("preview").classList.add("hidden");$("dropZone").classList.remove("hidden");$("scanActions").classList.add("hidden");$("cropInput").value=""};
-$("analyzeBtn").onclick=async()=>{if(!selectedFile)return;const btn=$("analyzeBtn");btn.disabled=true;btn.textContent="Analyzing…";setTimeout(async()=>{const diagnosis={name:"Possible fungal leaf disease",confidence:"Demo assessment • AI integration ready",symptoms:"Leaf spots, discoloration or lesions may be associated with fungal disease. A clear close-up and expert confirmation are recommended.",action:"Use an approved crop-specific fungicide only according to its label. Improve airflow, avoid wetting foliage unnecessarily, and remove badly affected material where appropriate.",product:products[1]};renderResult(diagnosis);await saveScan(diagnosis);btn.disabled=false;btn.textContent="🔍 Analyze crop"},1200)};
-function renderResult(d){$("resultCard").innerHTML=`<div class="diagnosis"><span class="pill">AI CROP HEALTH RESULT</span><h2>${d.name}</h2><span class="confidence">${d.confidence}</span><div class="treatment"><b>What to look for</b><p>${d.symptoms}</p><b>Recommended next step</b><p>${d.action}</p><button class="secondary" onclick="showView('products')">View treatment products →</button></div><p class="muted" style="margin-top:18px">This prototype does not replace diagnosis by a qualified agricultural professional.</p></div>`}
-async function saveScan(d){const local={id:Date.now(),name:d.name,date:new Date().toLocaleString(),image:$("preview").src};const arr=JSON.parse(localStorage.getItem("farmguard_scans")||"[]");arr.unshift(local);localStorage.setItem("farmguard_scans",JSON.stringify(arr));if(sb&&user){try{let path=`${user.id}/${Date.now()}-${selectedFile.name}`;await sb.storage.from("crop-images").upload(path,selectedFile);await sb.from("scans").insert({user_id:user.id,disease_name:d.name,confidence:d.confidence,image_path:path})}catch(e){console.warn(e)}}loadHistory()}
-async function loadHistory(){let arr=JSON.parse(localStorage.getItem("farmguard_scans")||"[]");if(sb&&user){const r=await sb.from("scans").select("*").eq("user_id",user.id).order("created_at",{ascending:false});if(!r.error&&r.data?.length)arr=r.data.map(x=>({name:x.disease_name,date:new Date(x.created_at).toLocaleString(),image:""}))}$("historyList").innerHTML=arr.length?arr.map(x=>`<div class="history-item">${x.image?`<img src="${x.image}">`:`<div style="width:85px;height:70px;border-radius:10px;background:#eaf6ed;display:grid;place-items:center;font-size:30px">🌿</div>`}<div><h3>${x.name}</h3><p>${x.date}</p></div></div>`).join(""):`<div class="empty-result"><span>📋</span><h2>No scans yet</h2><p>Your crop scan history will appear here.</p></div>`}
+// ----- Auth -----
+function setMode(signup) {
+  isSignup = signup;
+  $('loginTab').classList.toggle('active', !signup);
+  $('signupTab').classList.toggle('active', signup);
+  $('nameLabel').classList.toggle('hidden', !signup);
+  $('authSubmit').textContent = signup ? 'Create account' : 'Login';
+}
+$('loginTab').onclick = () => setMode(false);
+$('signupTab').onclick = () => setMode(true);
+$('authNote').textContent = demo ? 'Demo mode: accounts are saved in this browser only.' : 'Secure authentication powered by Supabase';
 
-(async()=>{if(sb){const r=await sb.auth.getSession();if(r.data.session)enterApp(r.data.session.user)}})();
+function enter(u) {
+  user = u;
+  $('authView').classList.add('hidden'); $('appView').classList.remove('hidden');
+  $('menuBtn').classList.remove('hidden');
+  go('home');
+}
+function showAuth() {
+  user = null; resetScan();
+  $('appView').classList.add('hidden'); $('authView').classList.remove('hidden');
+  $('menuBtn').classList.add('hidden'); closeMenu();
+}
+
+$('authForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = $('email').value.trim().toLowerCase(), password = $('password').value, name = $('name').value.trim();
+  const btn = $('authSubmit'); btn.disabled = true;
+  try {
+    if (demo) {
+      const users = store.get('fg_users', {});
+      if (isSignup) {
+        if (users[email]) throw new Error('Account already exists. Please login.');
+        users[email] = { name: name || email.split('@')[0], password }; store.set('fg_users', users);
+        store.set('fg_session', email); enter({ email, name: users[email].name }); toast('Account created');
+      } else {
+        if (!users[email] || users[email].password !== password) throw new Error('Wrong email or password.');
+        store.set('fg_session', email); enter({ email, name: users[email].name }); toast('Welcome back!');
+      }
+    } else if (isSignup) {
+      const { data, error } = await sb.auth.signUp({ email, password, options: { data: { name } } });
+      if (error) throw error;
+      if (data.session) { enter({ email, name: name || email.split('@')[0] }); toast('Account created'); }
+      else { toast('Check your email to confirm, then login.'); setMode(false); }
+    } else {
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      const u = data.user; enter({ email: u.email, name: (u.user_metadata && u.user_metadata.name) || u.email.split('@')[0] });
+      toast('Welcome back!');
+    }
+    $('authForm').reset();
+  } catch (err) { toast(err.message || 'Something went wrong'); }
+  btn.disabled = false;
+});
+
+async function logout() {
+  if (demo) store.set('fg_session', null); else await sb.auth.signOut();
+  showAuth(); setMode(false);
+}
+$('logoutBtn').onclick = logout;
+$('addAccountBtn').onclick = async () => { await logout(); setMode(true); toast('Create a new account'); };
+
+// ----- Scan -----
+function resetScan() {
+  file = null; $('cropInput').value = '';
+  $('preview').classList.add('hidden'); $('scanActions').classList.add('hidden'); $('dropZone').classList.remove('hidden');
+  $('resultCard').innerHTML = '<div class="empty-result"><span>🌿</span><h2>Your result will appear here</h2><p>Upload a crop photo to begin.</p></div>';
+}
+$('chooseBtn').onclick = (e) => { e.stopPropagation(); $('cropInput').click(); };
+$('dropZone').onclick = () => $('cropInput').click();
+$('clearBtn').onclick = resetScan;
+$('cropInput').addEventListener('change', (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  if (!f.type.startsWith('image/')) return toast('Please choose an image file.');
+  if (f.size > 8 * 1024 * 1024) return toast('Image is too large (max 8 MB).');
+  file = f;
+  const p = $('preview'); p.src = URL.createObjectURL(f);
+  p.classList.remove('hidden'); $('scanActions').classList.remove('hidden'); $('dropZone').classList.add('hidden');
+});
+
+function thumbnail(f) {
+  return new Promise((res) => {
+    const img = new Image(), url = URL.createObjectURL(f);
+    img.onload = () => {
+      const c = document.createElement('canvas'), s = 120 / Math.max(img.width, img.height);
+      c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', 0.7));
+    };
+    img.onerror = () => res(''); img.src = url;
+  });
+}
+const histKey = () => 'fg_hist_' + user.email;
+
+$('analyzeBtn').onclick = async () => {
+  if (!file) return toast('Choose a photo first.');
+  const btn = $('analyzeBtn'); btn.disabled = true; btn.textContent = '⏳ Analyzing...';
+  $('resultCard').innerHTML = '<div class="empty-result"><span>🔬</span><h2>Analyzing your crop...</h2></div>';
+  await new Promise((r) => setTimeout(r, 1500));
+  // Demo diagnosis layer: replace with a real model/API call later.
+  const d = DIAGNOSES[file.size % DIAGNOSES.length], conf = 70 + (file.size % 25);
+  const sevCls = d.sev === 'None' ? '' : d.sev === 'Mild' ? 'warn' : 'bad';
+  const prods = d.products.map((id) => PRODUCTS.find((p) => p.id === id)).filter(Boolean);
+  $('resultCard').innerHTML =
+    `<span class="pill">RESULT</span><h2>${esc(d.name)}</h2>
+     <span class="tag">${conf}% confidence</span><span class="tag ${sevCls}">Severity: ${esc(d.sev)}</span>
+     <p><b>Signs:</b> ${esc(d.symptoms)}</p><p><b>Advice:</b> ${esc(d.advice)}</p>` +
+    (prods.length ? `<p><b>Suggested products:</b></p>${prods.map((p) => `<span class="tag">${esc(p.name)}</span>`).join('')}` : '') +
+    `<div class="notice">⚠️ Demo assessment, not a confirmed diagnosis. Verify with a local agriculture officer and follow product labels.</div>`;
+  const h = store.get(histKey(), []);
+  h.unshift({ id: Date.now(), name: d.name, conf, sev: d.sev, date: new Date().toLocaleString(), img: await thumbnail(file) });
+  store.set(histKey(), h.slice(0, 30));
+  btn.disabled = false; btn.textContent = '🔍 Analyze crop'; toast('Scan saved to My Scans');
+};
+
+// ----- Products / History / Profile -----
+function renderProducts() {
+  const q = $('productSearch').value.trim().toLowerCase();
+  const list = PRODUCTS.filter((p) => (p.name + ' ' + p.type + ' ' + p.target).toLowerCase().includes(q));
+  $('productsGrid').innerHTML = list.length
+    ? list.map((p) => `<div class="product"><h3>${esc(p.name)}</h3><span class="tag">${esc(p.type)}</span><p><b>For:</b> ${esc(p.target)}</p><p>${esc(p.note)}</p></div>`).join('')
+    : '<p class="muted">No products match your search.</p>';
+}
+$('productSearch').addEventListener('input', renderProducts);
+
+function renderHistory() {
+  const h = store.get(histKey(), []);
+  $('historyList').innerHTML = h.length
+    ? h.map((s) => `<div class="history-item">${s.img ? `<img src="${s.img}" alt="">` : '<span style="font-size:2em">🌿</span>'}
+        <div><b>${esc(s.name)}</b><br><span class="muted">${s.conf}% · ${esc(s.sev)} · ${esc(s.date)}</span></div>
+        <button data-del="${s.id}" aria-label="Delete scan">🗑</button></div>`).join('')
+    : '<p class="muted">No scans yet. Scan a crop to see it here.</p>';
+}
+$('historyList').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-del]'); if (!b) return;
+  store.set(histKey(), store.get(histKey(), []).filter((s) => String(s.id) !== b.dataset.del));
+  renderHistory(); toast('Scan deleted');
+});
+
+function renderProfile() {
+  $('profileName').textContent = user.name; $('profileEmail').textContent = user.email;
+  $('profileMode').textContent = demo ? 'DEMO ACCOUNT' : 'SUPABASE ACCOUNT';
+  $('profileScans').textContent = store.get(histKey(), []).length + ' scans saved';
+}
+
+// ----- Settings -----
+function applySettings() {
+  const s = store.get('fg_settings', { dark: false, size: 'normal' });
+  document.body.classList.toggle('dark', !!s.dark);
+  document.body.classList.remove('size-small', 'size-large');
+  if (s.size !== 'normal') document.body.classList.add('size-' + s.size);
+  $('darkToggle').checked = !!s.dark; $('sizeSelect').value = s.size;
+}
+function saveSettings() { store.set('fg_settings', { dark: $('darkToggle').checked, size: $('sizeSelect').value }); applySettings(); }
+$('darkToggle').onchange = saveSettings; $('sizeSelect').onchange = saveSettings;
+$('clearHistoryBtn').onclick = () => {
+  if (confirm('Delete all your saved scans?')) { store.set(histKey(), []); renderHistory(); toast('History cleared'); }
+};
+
+// ----- Start -----
+(async function init() {
+  applySettings(); setMode(false);
+  if (demo) {
+    const email = store.get('fg_session', null), users = store.get('fg_users', {});
+    if (email && users[email]) enter({ email, name: users[email].name });
+  } else {
+    const { data } = await sb.auth.getSession();
+    if (data.session) { const u = data.session.user; enter({ email: u.email, name: (u.user_metadata && u.user_metadata.name) || u.email.split('@')[0] }); }
+  }
+})();
