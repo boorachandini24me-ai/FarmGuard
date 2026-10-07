@@ -23,22 +23,31 @@
     nav.dataset.extra="1";
     [["fertilizer","🌱 Fertilizer"],["weather","🌤️ Weather"],["soil","🧪 Soil Tools"],["help","❓ Help"]].forEach(function(x){var a=document.createElement("a");a.href="#"+x[0];a.dataset.page=x[0];a.textContent=x[1];nav.appendChild(a)});
   }
-  function authModal(){
-    var modal=document.getElementById("modal"),body=document.getElementById("modalbody");
-    body.innerHTML='<span class="eyebrow">ACCOUNT</span><h2>👨‍🌾 Farmer Account</h2><div class="grid"><input id="aname" class="input" placeholder="Full name"><input id="aemail" class="input" type="email" placeholder="Email"><input id="apass" class="input" type="password" placeholder="Password"><button class="btn primary full" id="signup">Create account</button><button class="btn secondary full" id="signin">Login</button><p id="amsg" class="muted">Demo authentication is stored in this browser. Real Supabase Auth can be enabled after adding your project URL and anon key.</p></div>';
+  function authModal(mode){
+    var modal=document.getElementById("modal"),body=document.getElementById("modalbody"),signup=mode==="signup";
+    body.innerHTML='<span class="eyebrow">SECURE FARMER ACCOUNT</span><h2>'+(signup?"✨ Create your account":"🔐 Welcome back")+'</h2><p class="muted">'+(signup?"Join AgriCare AI to save scans, reminders and preferences.":"Login to continue to your AgriCare AI dashboard.")+'</p><div class="grid">'+(signup?'<input id="aname" class="input" placeholder="Full name">':"")+'<input id="aemail" class="input" type="email" placeholder="Email address"><input id="apass" class="input" type="password" placeholder="Password"><button class="btn primary full" id="authSubmit">'+(signup?"Create Account":"Login")+'</button>'+(signup?'':'<button class="btn secondary full" id="switchSignup">Create new account</button>')+'<p id="amsg" class="muted">For this submission build, account details are stored in this browser.</p></div>';
     modal.classList.remove("hide");
-    document.getElementById("signup").onclick=function(){authDo(true)};
-    document.getElementById("signin").onclick=function(){authDo(false)};
+    document.getElementById("authSubmit").onclick=function(){authDo(signup)};
+    var sw=document.getElementById("switchSignup");if(sw)sw.onclick=function(){authModal("signup")};
   }
   function authDo(signup){
-    var e=document.getElementById("aemail").value.trim().toLowerCase(),n=document.getElementById("aname").value.trim()||"Farmer",m=document.getElementById("amsg");
-    if(!e){m.textContent="Enter an email.";return}
+    var e=document.getElementById("aemail").value.trim().toLowerCase(),p=document.getElementById("apass").value,n=signup?(document.getElementById("aname").value.trim()||"Farmer"):"Farmer",m=document.getElementById("amsg");
+    if(!e||!p){m.textContent="Please enter email and password.";return}
     var ac;try{ac=JSON.parse(localStorage.getItem("agriAccounts")||"[]")}catch(x){ac=[]}
-    if(signup){if(ac.some(function(a){return a.email===e})){m.textContent="Account already exists. Please login.";return}ac.push({email:e,name:n});localStorage.setItem("agriAccounts",JSON.stringify(ac));localStorage.setItem("agriUser",JSON.stringify({email:e,name:n}));m.textContent="Account created successfully.";setTimeout(function(){modalClose()},300)}
-    else{var u=ac.find(function(a){return a.email===e});if(!u){m.textContent="Account not found. Create an account first.";return}localStorage.setItem("agriUser",JSON.stringify({email:u.email,name:u.name}));m.textContent="Login successful.";setTimeout(function(){modalClose();toast2("Welcome back 👋")},300)}
+    if(signup){if(ac.some(function(a){return a.email===e})){m.textContent="Account already exists. Please login.";return}ac.push({email:e,password:p,name:n});localStorage.setItem("agriAccounts",JSON.stringify(ac));localStorage.setItem("agriUser",JSON.stringify({email:e,name:n}));m.textContent="Account created successfully.";setTimeout(function(){modalClose();toast2("Account created 👋")},300)}
+    else{var u=ac.find(function(a){return a.email===e&&a.password===p});if(!u){m.textContent="Incorrect email or password.";return}localStorage.setItem("agriUser",JSON.stringify({email:u.email,name:u.name}));m.textContent="Login successful.";setTimeout(function(){modalClose();toast2("Welcome back 👋")},300)}
   }
   function modalClose(){document.getElementById("modal").classList.add("hide");location.hash=location.hash||"#home"}
-  function patchLogin(){var b=document.getElementById("login");if(b&&!b.dataset.authPatched){b.dataset.authPatched="1";b.onclick=authModal}}
+  function patchLogin(){var b=document.getElementById("login");if(b&&!b.dataset.authPatched){b.dataset.authPatched="1";b.onclick=function(){authModal("login")}}}
+  function welcomeSetup(){
+    var w=document.getElementById("welcome");if(!w)return;
+    var seen=localStorage.getItem("agriWelcomeSeen");
+    if(seen==="1")w.classList.add("hide");
+    document.getElementById("welcomeLogin").onclick=function(){w.classList.add("hide");authModal("login")};
+    document.getElementById("welcomeSignup").onclick=function(){w.classList.add("hide");authModal("signup")};
+    document.getElementById("welcomeGuest").onclick=function(){w.classList.add("hide");localStorage.setItem("agriWelcomeSeen","1")};
+    document.getElementById("welcomeClose").onclick=function(){w.classList.add("hide");localStorage.setItem("agriWelcomeSeen","1")};
+  }
   function route(){addNav();patchLogin();var p=location.hash.replace("#","")||"home";if(pageExtra(p))document.querySelectorAll("nav a").forEach(function(a){a.classList.toggle("active",a.dataset.page===p)})}
-  window.addEventListener("hashchange",route);window.addEventListener("load",route);setTimeout(route,50);
+  window.addEventListener("hashchange",route);window.addEventListener("load",function(){route();welcomeSetup()});setTimeout(function(){route();welcomeSetup()},50);
 })();
