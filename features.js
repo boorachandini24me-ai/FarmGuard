@@ -31,11 +31,11 @@
     document.getElementById("signin").onclick=function(){authDo(false)};
   }
   function authDo(signup){
-    var e=document.getElementById("aemail").value.trim().toLowerCase(),p=document.getElementById("apass").value,n=document.getElementById("aname").value.trim()||"Farmer",m=document.getElementById("amsg");
-    if(!e||!p){m.textContent="Enter email and password.";return}
+    var e=document.getElementById("aemail").value.trim().toLowerCase(),n=document.getElementById("aname").value.trim()||"Farmer",m=document.getElementById("amsg");
+    if(!e){m.textContent="Enter an email.";return}
     var ac;try{ac=JSON.parse(localStorage.getItem("agriAccounts")||"[]")}catch(x){ac=[]}
-    if(signup){if(ac.some(function(a){return a.email===e})){m.textContent="Account already exists. Please login.";return}ac.push({email:e,password:p,name:n});localStorage.setItem("agriAccounts",JSON.stringify(ac));localStorage.setItem("agriUser",JSON.stringify({email:e,name:n}));m.textContent="Account created successfully.";setTimeout(function(){modalClose()},300)}
-    else{var u=ac.find(function(a){return a.email===e&&a.password===p});if(!u){m.textContent="Account not found. Create an account first.";return}localStorage.setItem("agriUser",JSON.stringify({email:u.email,name:u.name}));m.textContent="Login successful.";setTimeout(function(){modalClose();toast2("Welcome back 👋")},300)}
+    if(signup){if(ac.some(function(a){return a.email===e})){m.textContent="Account already exists. Please login.";return}ac.push({email:e,name:n});localStorage.setItem("agriAccounts",JSON.stringify(ac));localStorage.setItem("agriUser",JSON.stringify({email:e,name:n}));m.textContent="Account created successfully.";setTimeout(function(){modalClose()},300)}
+    else{var u=ac.find(function(a){return a.email===e});if(!u){m.textContent="Account not found. Create an account first.";return}localStorage.setItem("agriUser",JSON.stringify({email:u.email,name:u.name}));m.textContent="Login successful.";setTimeout(function(){modalClose();toast2("Welcome back 👋")},300)}
   }
   function modalClose(){document.getElementById("modal").classList.add("hide");location.hash=location.hash||"#home"}
   function patchLogin(){var b=document.getElementById("login");if(b&&!b.dataset.authPatched){b.dataset.authPatched="1";b.onclick=authModal}}
