@@ -46,3 +46,55 @@ function bindProducts(){document.querySelectorAll("[data-product]").forEach(b=>b
 function bind(){document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>nav(b.dataset.go));bindProducts();document.querySelectorAll("[data-qty]").forEach(b=>b.onclick=()=>qty(...b.dataset.qty.split(":")));document.querySelectorAll("[data-remove]").forEach(b=>b.onclick=()=>{state.cart=state.cart.filter(x=>x.id!==b.dataset.remove);save();render()});document.querySelectorAll("[data-save]").forEach(b=>b.onclick=()=>{let id=b.dataset.save;if(!state.wishlist.includes(id))state.wishlist.push(id);state.cart=state.cart.filter(x=>x.id!==id);save();render();toast("Saved for later ❤️")});document.querySelectorAll("[data-searchcrop]").forEach(b=>b.onclick=()=>{window.storeQuery=b.dataset.searchcrop;nav("store")});document.querySelectorAll("[data-disease]").forEach(b=>b.onclick=()=>{let d=diseases.find(x=>x.id===b.dataset.disease);window.storeQuery=d.name;nav("store")});document.querySelectorAll("[data-cancel]").forEach(b=>b.onclick=()=>{state.orders[Number(b.dataset.cancel)].status="Cancelled";save();render()});document.querySelectorAll("[data-delete-reminder]").forEach(b=>b.onclick=()=>{state.reminders.splice(Number(b.dataset.deleteReminder),1);save();render();toast("Reminder deleted 🔔")});let a=$("analyzeBtn");if(a)a.onclick=analyze;let p=$("planBtn");if(p)p.onclick=()=>{$("plan").innerHTML="<h3>💧 Suggested starter plan</h3><p>"+($("weather").value==="Rainy"?"Reduce irrigation and check drainage.":$("soil").value==="Sandy soil"?"Use smaller, more frequent watering cycles.":"Water deeply when the top soil becomes dry and avoid waterlogging.")+"</p>"};let r=$("addReminder");if(r)r.onclick=()=>{let t=$("reminderText").value.trim();if(!t)return toast("Enter a reminder");state.reminders.push({text:t,date:$("reminderDate").value||"No date"});save();render()};let po=$("placeOrder");if(po)po.onclick=placeOrder;let lo=$("logoutBtn");if(lo)lo.onclick=()=>{localStorage.removeItem("agriUser");toast("Logged out");nav("home")};document.querySelectorAll("[data-buy]").forEach(b=>b.onclick=()=>{addCart(b.dataset.buy);nav("checkout")});document.querySelectorAll("[data-review]").forEach(b=>b.onclick=()=>reviewModal(b.dataset.review));let sq=$("storeSearch");if(sq){sq.oninput=()=>{window.storeQuery=sq.value;applyStore()};["catFilter","cropFilter","priceFilter","ratingFilter","sortFilter"].forEach(id=>$(id).onchange=applyStore);document.querySelectorAll("[data-quick]").forEach(b=>b.onclick=()=>{window.storeQuick=b.dataset.quick;document.querySelectorAll("[data-quick]").forEach(x=>x.classList.remove("active"));b.classList.add("active");applyStore()});applyStore()}}
 function render(){let p=(location.hash.replace(/^#/,"").split("?")[0])||"home",pages={home,scan,crops:cropsPage,diseases:diseasesPage,store,wishlist:wishlistPage,cart:cartPage,checkout:checkoutPage,orders:ordersPage,product:productPage,water:waterPage,reminders:remindersPage,history:historyPage,profile:profilePage,help:helpPage};document.querySelectorAll("nav a").forEach(a=>a.classList.toggle("active",a.dataset.page===p));$("app").innerHTML=(pages[p]||home)();bind()}
 $("theme").onclick=()=>{state.dark=!state.dark;document.body.classList.toggle("dark",state.dark);save()};$("mic").onclick=()=>{let R=window.SpeechRecognition||window.webkitSpeechRecognition;if(!R)return toast("Voice search is not supported");let r=new R();r.lang="en-IN";r.onresult=e=>{window.storeQuery=e.results[0][0].transcript;nav("store")};r.start()};$("q").onkeydown=e=>{if(e.key==="Enter"){window.storeQuery=$("q").value;nav("store")}};window.addEventListener("hashchange",render);document.body.classList.toggle("dark",state.dark);render();
+/* --- AgriCare AI: search + language controls --- */
+const LANG={
+ en:{home:"Home",scan:"Scan Crop",crops:"Crops",diseases:"Diseases",store:"Store",wishlist:"Wishlist",cart:"Cart",orders:"Orders",water:"Irrigation",reminders:"Reminders",history:"My Scans",profile:"Profile",help:"Help",search:"Search products, crops, diseases...",voice:"Voice search",login:"Login",welcome:"WELCOME TO AGRICARE AI",smart:"Smart farming. Simple decisions.",continue:"Continue as Guest"},
+ te:{home:"హోమ్",scan:"పంట స్కాన్",crops:"పంటలు",diseases:"వ్యాధులు",store:"స్టోర్",wishlist:"విష్‌లిస్ట్",cart:"కార్ట్",orders:"ఆర్డర్లు",water:"నీటిపారుదల",reminders:"రిమైండర్లు",history:"నా స్కాన్లు",profile:"ప్రొఫైల్",help:"సహాయం",search:"ఉత్పత్తులు, పంటలు, వ్యాధులు వెతకండి...",voice:"వాయిస్ సెర్చ్",login:"లాగిన్",welcome:"AGRICARE AI కి స్వాగతం",smart:"స్మార్ట్ వ్యవసాయం. సులభమైన నిర్ణయాలు.",continue:"గెస్ట్‌గా కొనసాగండి"},
+ hi:{home:"होम",scan:"फसल स्कैन",crops:"फसलें",diseases:"रोग",store:"स्टोर",wishlist:"विशलिस्ट",cart:"कार्ट",orders:"ऑर्डर",water:"सिंचाई",reminders:"रिमाइंडर",history:"मेरे स्कैन",profile:"प्रोफ़ाइल",help:"मदद",search:"उत्पाद, फसल या रोग खोजें...",voice:"वॉइस सर्च",login:"लॉगिन",welcome:"AGRICARE AI में आपका स्वागत है",smart:"स्मार्ट खेती। आसान निर्णय।",continue:"अतिथि के रूप में जारी रखें"}
+};
+state.language=state.language||"en";
+function applyLanguage(){
+ const l=LANG[state.language]||LANG.en;
+ const map={home:l.home,scan:l.scan,crops:l.crops,diseases:l.diseases,store:l.store,wishlist:l.wishlist,cart:l.cart,orders:l.orders,water:l.water,reminders:l.reminders,history:l.history,profile:l.profile,help:l.help};
+ document.querySelectorAll("nav a[data-page]").forEach(a=>{const k=a.dataset.page;if(map[k]){const icon=(a.textContent.match(/^\S+/)||[""])[0];a.textContent=icon+" "+map[k];}});
+ const q=$("q"); if(q)q.placeholder=l.search;
+ const mic=$("mic"); if(mic)mic.title=l.voice;
+ const login=$("login"); if(login)login.title=l.login;
+ const lang=$("language"); if(lang)lang.value=state.language;
+ const ss=$("storeSearch"); if(ss)ss.placeholder=l.search;
+ const wl=$("welcome"); if(wl){
+   const e=wl.querySelector(".eyebrow"); if(e)e.textContent=l.welcome;
+   const h=wl.querySelector("h1"); if(h)h.innerHTML=l.smart.replace(" ","<br>");
+   const g=$("welcomeGuest"); if(g)g.textContent=l.continue;
+ }
+}
+function setLanguage(v){state.language=LANG[v]?v:"en";save();applyLanguage();toast(state.language==="te"?"భాష తెలుగు కి మార్చబడింది":state.language==="hi"?"भाषा हिंदी में बदल गई":"Language changed to English");}
+const languageSelect=$("language");
+if(languageSelect)languageSelect.onchange=e=>setLanguage(e.target.value);
+const topSearch=$("q");
+if(topSearch){
+ let timer;
+ topSearch.oninput=()=>{
+   clearTimeout(timer);
+   const value=topSearch.value.trim();
+   window.storeQuery=value;
+   if(location.hash.replace(/^#/,"").split("?")[0]==="store") applyStore();
+   else if(value.length>=2){timer=setTimeout(()=>nav("store"),350);}
+ };
+ topSearch.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();window.storeQuery=topSearch.value.trim();nav("store");}};
+}
+const micButton=$("mic");
+if(micButton)micButton.onclick=()=>{
+ const R=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(!R)return toast("Voice search is not supported in this browser");
+ if(window.__agriVoiceActive)return;
+ const r=new R(); window.__agriVoiceActive=true;
+ r.lang=state.language==="te"?"te-IN":state.language==="hi"?"hi-IN":"en-IN";
+ r.continuous=false;r.interimResults=true;r.maxAlternatives=1;
+ micButton.textContent="🔴";micButton.disabled=true;
+ r.onresult=e=>{const last=e.results[e.results.length-1];if(last&&last[0]){topSearch.value=last[0].transcript;window.storeQuery=last[0].transcript;}};
+ r.onerror=e=>{const m={ "not-allowed":"Microphone permission is blocked","no-speech":"No speech detected","network":"Voice search network error"};toast(m[e.error]||"Voice search failed");};
+ r.onend=()=>{window.__agriVoiceActive=false;micButton.textContent="🎙️";micButton.disabled=false;if(window.storeQuery)nav("store");};
+ try{r.start();}catch(e){window.__agriVoiceActive=false;micButton.textContent="🎙️";micButton.disabled=false;}
+};
+applyLanguage();
