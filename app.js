@@ -20,7 +20,7 @@ en:{home:"Home",scan:"Scan Crop",crops:"Crops",diseases:"Diseases",store:"Farm S
 te:{home:"హోమ్",scan:"పంట స్కాన్",crops:"పంటలు",diseases:"వ్యాధులు",store:"ఫార్మ్ స్టోర్",wishlist:"విష్‌లిస్ట్",cart:"కార్ట్",orders:"ఆర్డర్లు",water:"నీటిపారుదల",reminders:"రిమైండర్లు",history:"నా స్కాన్లు",profile:"ప్రొఫైల్",help:"సహాయం",search:"ఉత్పత్తులు, పంటలు, వ్యాధులు వెతకండి...",voice:"వాయిస్ సెర్చ్",login:"లాగిన్"},
 hi:{home:"होम",scan:"फसल स्कैन",crops:"फसलें",diseases:"रोग",store:"फार्म स्टोर",wishlist:"विशलिस्ट",cart:"कार्ट",orders:"ऑर्डर",water:"सिंचाई",reminders:"रिमाइंडर",history:"मेरे स्कैन",profile:"प्रोफ़ाइल",help:"मदद",search:"उत्पाद, फसल या रोग खोजें...",voice:"वॉइस सर्च",login:"लॉगिन"}
 };
-const defaultState={cart:[],wishlist:[],orders:[],scans:[],reminders:[],reviews:[],language:"en",dark:false};
+const defaultState={cart:[],wishlist:[],orders:[],scans:[],reminders:[],reviews:[],language:"en"};
 let state={...defaultState,...JSON.parse(localStorage.getItem("agriState")||"{}")};
 function save(){localStorage.setItem("agriState",JSON.stringify(state));updateBadge()}
 function toast(msg){const t=$("toast");if(!t)return;t.textContent=msg;t.classList.remove("hide");clearTimeout(window.__toast);window.__toast=setTimeout(()=>t.classList.add("hide"),2200)}
@@ -57,12 +57,10 @@ function bind(){document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>
 function applyLanguage(){const l=LANG[state.language]||LANG.en;document.querySelectorAll("nav a[data-page]").forEach(a=>{const k=a.dataset.page;if(l[k]){const icon=a.textContent.trim().slice(0,2);const span=a.querySelector("span");if(span)span.textContent=l[k]}});const q=$("q");if(q)q.placeholder=l.search;const mic=$("mic");if(mic)mic.title=l.voice;const login=$("login");if(login)login.title=l.login;const lang=$("language");if(lang)lang.value=state.language}
 function setLanguage(v){state.language=LANG[v]?v:"en";save();applyLanguage();render();toast(state.language==="te"?"భాష తెలుగు కి మార్చబడింది":state.language==="hi"?"भाषा हिंदी में बदल गई":"Language changed to English")}
 function render(){const p=(location.hash.replace(/^#/,"").split("?")[0])||"home";const pages={home,scan,crops:cropsPage,diseases:diseasesPage,store,wishlist:wishlistPage,cart:cartPage,checkout:checkoutPage,orders:ordersPage,product:productPage,water:waterPage,reminders:remindersPage,history:historyPage,profile:profilePage,help:helpPage};document.querySelectorAll(".sidebar nav a,.mobile-nav a").forEach(a=>a.classList.toggle("active",a.dataset.page===p));$("app").innerHTML=(pages[p]||home)();applyLanguage();bind();updateBadge()}
-$("theme").onclick=()=>{state.dark=!state.dark;document.body.classList.toggle("dark",state.dark);save()};
 $("language").onchange=e=>setLanguage(e.target.value);
 $("close").onclick=()=>{const m=$("modal");m.classList.add("hide")};
 $("q").onkeydown=e=>{if(e.key==="Enter"){window.storeQuery=$("q").value.trim();nav("store")}};
 $("q").oninput=e=>{window.storeQuery=e.target.value;if(e.target.value.trim().length>=2&&!(location.hash.includes("store")))clearTimeout(window.__search);window.__search=setTimeout(()=>{if($("q").value.trim().length>=2)nav("store")},350)};
 $("mic").onclick=()=>{const R=window.SpeechRecognition||window.webkitSpeechRecognition;if(!R)return toast("Voice search is not supported");if(window.__voice)return;const r=new R();window.__voice=true;r.lang=state.language==="te"?"te-IN":state.language==="hi"?"hi-IN":"en-IN";r.continuous=false;r.interimResults=true;$("mic").textContent="🔴";r.onresult=e=>{$("q").value=e.results[e.results.length-1][0].transcript;window.storeQuery=$("q").value};r.onerror=()=>toast("Voice search failed");r.onend=()=>{window.__voice=false;$("mic").textContent="🎙️";if(window.storeQuery)nav("store")};try{r.start()}catch(e){window.__voice=false;$("mic").textContent="🎙️"}};
 window.addEventListener("hashchange",render);
-document.body.classList.toggle("dark",state.dark);
 render();
