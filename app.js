@@ -21,7 +21,7 @@ te:{home:"హోమ్",scan:"పంట స్కాన్",crops:"పంటల�
 hi:{home:"होम",scan:"फसल स्कैन",crops:"फसलें",diseases:"रोग",store:"फार्म स्टोर",wishlist:"विशलिस्ट",cart:"कार्ट",orders:"ऑर्डर",water:"सिंचाई",reminders:"रिमाइंडर",history:"मेरे स्कैन",profile:"प्रोफ़ाइल",help:"मदद",search:"उत्पाद, फसल या रोग खोजें...",voice:"वॉइस सर्च",login:"लॉगिन"}
 };
 const defaultState={cart:[],wishlist:[],orders:[],scans:[],reminders:[],reviews:[],language:"en"};
-let state={...defaultState,...JSON.parse(localStorage.getItem("agriState")||"{}")};
+let state=(()=>{try{return {...defaultState,...JSON.parse(localStorage.getItem("agriState")||"{}")}}catch(e){localStorage.removeItem("agriState");return {...defaultState}}})();
 function save(){localStorage.setItem("agriState",JSON.stringify(state));updateBadge()}
 function toast(msg){const t=$("toast");if(!t)return;t.textContent=msg;t.classList.remove("hide");clearTimeout(window.__toast);window.__toast=setTimeout(()=>t.classList.add("hide"),2200)}
 function user(){try{return JSON.parse(localStorage.getItem("agriUser")||"null")}catch(e){return null}}
